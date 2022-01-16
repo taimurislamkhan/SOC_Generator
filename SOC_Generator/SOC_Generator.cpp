@@ -4,6 +4,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream>
+#include <iomanip>
+
 using namespace std;
 
 #define ROM 1
@@ -33,7 +36,7 @@ public:
     int cti_width  =    3;
     int bte_width  =    2;
     int mux_addr   =    0;
-    int mux_mask   =    0;
+    unsigned int mux_mask   =    0;
     int offset     =    0;
 
     string ios[12] = {};
@@ -142,6 +145,22 @@ void push_to_end(Node*& head_node, string name, bool is_master)
     push_to_end(head_node, name, is_master, 0);
 }
 
+int getSlaveCount(Node*& head_node)
+{
+    int count = 0;
+    Node* temp = head_node;
+
+    while (temp != NULL)
+    {
+        if (temp->is_master == false)
+        {
+            count++;
+        }
+        temp = temp->next;
+    }
+    return count;
+}
+
 string wb_module_gen(Node*& head_node)
 {
     string lines = "";
@@ -180,7 +199,7 @@ string wb_module_gen(Node*& head_node)
         lines += "input  \t\t"  + temp->ios[10] + ",\n\t";
         if (temp->next==NULL)
         {
-            lines += "input \t\t"  + temp->ios[11] + ");";
+            lines += "input \t\t"  + temp->ios[11] + ");\n";
         }
         else
         {
@@ -193,10 +212,59 @@ string wb_module_gen(Node*& head_node)
     return lines;
 }
 
+string int_to_hex(int number, int width)
+{
+    std::stringstream ss;
+    ss << std::setfill('0') << std::setw(width) << std::hex << (number | 0);
+    return ss.str();
 
+}
 string gen_wb_mux(Node*& head_node)
 {
+    Node* temp = new Node();
+    temp = head_node;
     string lines="";
+    int slave_count = 0;
+    slave_count = getSlaveCount(temp);
+    lines += "wb_mux\n\t #(.num_slaves (" + to_string(slave_count)+"),\n";
+    lines += "\t.MATCH_ADDR ({";
+    //lines += "32'h00000000, ";
+
+    //Generate Address Lines
+    while (temp!= NULL)
+    {
+        if (temp->is_master == false)
+        {
+            lines += "32'h";
+            lines += int_to_hex(temp->mux_addr, 8);
+
+            lines += ", ";
+
+            
+        }
+        temp = temp->next;
+        
+    }
+    lines += "\b\b}),\n";
+
+    //Generate Mask Line
+    lines += "\t.MATCH_MASK ({";
+    temp = head_node; // reset linked list to start
+    while (temp != NULL)
+    {
+        if (temp->is_master == false)
+        {
+            lines += "32'h";
+            lines += int_to_hex(temp->mux_mask,8);
+            lines += ", ";
+  
+
+        }
+        temp = temp->next;
+
+    }
+    lines += "\b\b})\n";
+
     return lines;
 }
 
@@ -204,7 +272,7 @@ string gen_wb_mux_io(Node*& head_node)
 {
     Node* temp = new Node();
     temp = head_node;
-    string lines;
+    string lines="";
     Node* slaves = NULL;
     Node* masters = NULL;
     int count = 0;
@@ -294,7 +362,8 @@ void wb_gen_addresses(Node*& head_node)
         if (temp->is_master == false)
         {
             temp->mux_addr = address;
-            cout <<hex<< temp->mux_addr << endl;
+            //cout <<hex<< temp->mux_addr << endl;
+            //cout << int_to_hex(temp->mux_addr, 8) << endl;
             address += temp->offset * 4;
         }
         temp = temp->next;
@@ -307,12 +376,14 @@ int main()
     Node* x = NULL; 
     push(x, "io", true,0);
     push_to_end(x, "rom", false,ROM);
+    push_to_end(x, "sys", false, SYS);
     push_to_end(x, "spi_flash", false,SPI);
     push_to_end(x, "uart", false, UART);
-    cout << wb_module_gen(x);
-    cout << gen_wb_mux_io(x);
 
-    //wb_gen_addresses(x);
+   cout << wb_module_gen(x);
+   wb_gen_addresses(x);
+   cout<< gen_wb_mux(x);
+   cout << gen_wb_mux_io(x);
 }
 
 
