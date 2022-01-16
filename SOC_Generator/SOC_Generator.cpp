@@ -6,6 +6,21 @@
 #include <string>
 using namespace std;
 
+#define ROM 1
+#define SYS 2
+#define SPI 3
+#define UART 4
+
+#define ROM_OFFSET  1024
+#define SYS_OFFSET  16
+#define SPI_OFFSET  16
+#define UART_OFFSET 1024
+
+#define ROM_MASK 0xfffff000
+#define SYS_MASK 0xffffffc0
+#define SPI_MASK 0xffffffc0
+#define UART_MASK 0xfffff000
+
 class Node
 {
 public:
@@ -17,9 +32,9 @@ public:
     int sel_width  =    4;
     int cti_width  =    3;
     int bte_width  =    2;
-    int mux_addr;
-    int mux_mask;
-    int offset;
+    int mux_addr   =    0;
+    int mux_mask   =    0;
+    int offset     =    0;
 
     string ios[12] = {};
     //0 n_adr_o
@@ -39,8 +54,23 @@ public:
 
     Node(string name_in, bool is_master_in)
     {
+        Node(name_in, is_master_in, 0);
+    }
+
+    Node(string name_in, bool is_master_in, int type)
+    {
         name = name_in;
         is_master = is_master_in;
+
+        switch (type)
+        {
+        case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK; break;
+        case SYS: offset = SYS_OFFSET; mux_mask = SYS_MASK; break;
+        case SPI: offset = SPI_OFFSET; mux_mask = SPI_MASK; break;
+        case UART: offset = UART_OFFSET; mux_mask = UART_MASK; break;
+        default:
+            break;
+        }
 
         if (is_master_in)
         {
@@ -76,22 +106,22 @@ public:
 
 };
 
-void push(Node*& head_node, string name,bool is_master)
+void push(Node*& head_node, string name,bool is_master,int type)
 {
-    Node* new_node = new Node(name,is_master);
+    Node* new_node = new Node(name,is_master,type);
     new_node->next = head_node;
- //   new_node->name = name;
-  //  new_node->is_master = is_master;
     head_node = new_node;
 
 }
-
-void push_to_end(Node*& head_node, string name, bool is_master)
+void push(Node*& head_node, string name, bool is_master)
 {
-    Node* new_node = new Node(name,is_master);
+    push(head_node, name, is_master, 0);
+}
+
+void push_to_end(Node*& head_node, string name, bool is_master,int type)
+{
+    Node* new_node = new Node(name,is_master,type);
     new_node->next = NULL;
-   // new_node->name = name;
-   // new_node->is_master = is_master;
     Node* last = head_node;
     if (head_node == NULL)
     {
@@ -105,6 +135,11 @@ void push_to_end(Node*& head_node, string name, bool is_master)
         }
         last->next = new_node;
     }
+}
+
+void push_to_end(Node*& head_node, string name, bool is_master)
+{
+    push_to_end(head_node, name, is_master, 0);
 }
 
 string wb_module_gen(Node*& head_node)
@@ -175,7 +210,7 @@ string gen_wb_mux_io(Node*& head_node)
     int count = 0;
 
     //create masters pin modes list
-    push(masters, "wbm_adr_i", false);
+    push       (masters, "wbm_adr_i", false);
     push_to_end(masters, "wbm_dat_i", false);
     push_to_end(masters, "wbm_sel_i", false);
     push_to_end(masters, "wbm_we_i ", false);
@@ -189,7 +224,7 @@ string gen_wb_mux_io(Node*& head_node)
     push_to_end(masters, "wbm_rty_o", false);
 
     //create slaves pin modes list
-    push(slaves, "wbs_adr_o",false);
+    push       (slaves, "wbs_adr_o",false);
     push_to_end(slaves, "wbs_dat_o", false);
     push_to_end(slaves, "wbs_sel_o", false);
     push_to_end(slaves, "wbs_we_o ", false);
@@ -248,14 +283,36 @@ string gen_wb_mux_io(Node*& head_node)
 }
 
 
+void wb_gen_addresses(Node*& head_node)
+{
+    Node* temp = new Node();
+    temp = head_node;
+    int address = 0;
+
+    while (temp != NULL)
+    {
+        if (temp->is_master == false)
+        {
+            temp->mux_addr = address;
+            cout <<hex<< temp->mux_addr << endl;
+            address += temp->offset * 4;
+        }
+        temp = temp->next;
+    }
+}
+
+
 int main()
 {
     Node* x = NULL; 
-    push(x, "io", true);
-    push_to_end(x, "rom", false);
-    push_to_end(x, "spi_flash", false);
+    push(x, "io", true,0);
+    push_to_end(x, "rom", false,ROM);
+    push_to_end(x, "spi_flash", false,SPI);
+    push_to_end(x, "uart", false, UART);
     cout << wb_module_gen(x);
     cout << gen_wb_mux_io(x);
+
+    //wb_gen_addresses(x);
 }
 
 
