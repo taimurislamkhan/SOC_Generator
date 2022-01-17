@@ -19,12 +19,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="D:\Desktop 05122021\Data\Cores-SweRVolf-EH1-master\Cores-SweRVolf-EH1-master\Cores-SweRVolf\build\swervolf_0.7.2\src\swervolf-wb_intercon_0.7.2\wb_intercon.v">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="D:\Desktop 05122021\Data\Cores-SweRVolf-EH1-master\Cores-SweRVolf-EH1-master\Cores-SweRVolf\build\swervolf_0.7.2\src\swervolf-wb_intercon_0.7.2\wb_intercon.vh">
-      <Filter>Source Files</Filter>
-    </None>
-  </ItemGroup>
 </Project>

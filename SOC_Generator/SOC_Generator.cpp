@@ -1,5 +1,4 @@
-// SOC_Generator.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+// The following file generates wb_intercon.v
 
 #include <iostream>
 #include <fstream>
@@ -9,24 +8,32 @@
 
 using namespace std;
 
+//Slave IDs
+
 #define ROM 1
 #define SYS 2
 #define SPI 3
 #define UART 4
+
+//Slave offsets. Defined in bytes
 
 #define ROM_OFFSET  1024
 #define SYS_OFFSET  16
 #define SPI_OFFSET  16
 #define UART_OFFSET 1024
 
+//Slave mask
+
 #define ROM_MASK 0xfffff000
 #define SYS_MASK 0xffffffc0
 #define SPI_MASK 0xffffffc0
 #define UART_MASK 0xfffff000
 
+/*Linked list containing master / slave properties.Constructor generates names and saves them in string arrays names ios*/
 class Node
 {
 public:
+    
     bool is_master=false;
     string name="";
     Node* next = NULL;
@@ -53,6 +60,7 @@ public:
     //10  n_err_i
     //11  n_rty_i
 
+
     Node() {}
 
     Node(string name_in, bool is_master_in)
@@ -65,6 +73,7 @@ public:
         name = name_in;
         is_master = is_master_in;
 
+        //set slave offset and masks
         switch (type)
         {
         case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK; break;
@@ -74,7 +83,7 @@ public:
         default:
             break;
         }
-
+        //Master and slave ios generation 
         if (is_master_in)
         {
             ios[0] = "wb_" + name_in + "_adr_i";
@@ -109,6 +118,7 @@ public:
 
 };
 
+//push new node in linked list
 void push(Node*& head_node, string name,bool is_master,int type)
 {
     Node* new_node = new Node(name,is_master,type);
@@ -121,6 +131,7 @@ void push(Node*& head_node, string name, bool is_master)
     push(head_node, name, is_master, 0);
 }
 
+//append new node to end of linked list
 void push_to_end(Node*& head_node, string name, bool is_master,int type)
 {
     Node* new_node = new Node(name,is_master,type);
@@ -145,6 +156,7 @@ void push_to_end(Node*& head_node, string name, bool is_master)
     push_to_end(head_node, name, is_master, 0);
 }
 
+//Get total number of nodes in a linked list
 int getSlaveCount(Node*& head_node)
 {
     int count = 0;
@@ -161,6 +173,7 @@ int getSlaveCount(Node*& head_node)
     return count;
 }
 
+//this functions iterates throug the entire linked list. It writes 12 io lines for each based on if its master or slave
 string wb_module_gen(Node*& head_node)
 {
     string lines = "";
@@ -212,6 +225,8 @@ string wb_module_gen(Node*& head_node)
     return lines;
 }
 
+//converts an integer to 8 byte wide string
+
 string int_to_hex(int number, int width)
 {
     std::stringstream ss;
@@ -219,6 +234,26 @@ string int_to_hex(int number, int width)
     return ss.str();
 
 }
+
+// Iterates through the whole linked list. Starting from 0 sets address according to offsets to each node
+void wb_gen_addresses(Node*& head_node)
+{
+    Node* temp = new Node();
+    temp = head_node;
+    int address = 0;
+
+    while (temp != NULL)
+    {
+        if (temp->is_master == false)
+        {
+            temp->mux_addr = address;
+            address += temp->offset * 4;
+        }
+        temp = temp->next;
+    }
+}
+
+// Iterates through the whole linked list and generates the wb_mux. Wb_mux requires slave masks/addresses only. Masters are excluded
 string gen_wb_mux(Node*& head_node)
 {
     Node* temp = new Node();
@@ -237,10 +272,8 @@ string gen_wb_mux(Node*& head_node)
         {
             lines += "32'h";
             lines += int_to_hex(temp->mux_addr, 8);
-
             lines += ", ";
-
-            
+ 
         }
         temp = temp->next;
         
@@ -257,16 +290,17 @@ string gen_wb_mux(Node*& head_node)
             lines += "32'h";
             lines += int_to_hex(temp->mux_mask,8);
             lines += ", ";
-  
 
         }
         temp = temp->next;
 
     }
-    lines += "\b\b})\n";
+    lines += "\b\b}))\n";
 
     return lines;
 }
+
+// Iterates through the entire linked list and generates wb_mux_io.
 
 string gen_wb_mux_io(Node*& head_node)
 {
@@ -323,6 +357,7 @@ string gen_wb_mux_io(Node*& head_node)
         lines += "\b), \n";
         temp = head_node;
         masters = masters->next;
+        count++;
     }
     count = 0;
     //write slaves
@@ -337,7 +372,7 @@ string gen_wb_mux_io(Node*& head_node)
             temp = temp->next;
         }
         if (slaves->next == NULL)
-            lines += "}));\n";
+            lines += "\b}));\n";
         else
         lines += "\b}),\n";
 
@@ -351,39 +386,28 @@ string gen_wb_mux_io(Node*& head_node)
 }
 
 
-void wb_gen_addresses(Node*& head_node)
-{
-    Node* temp = new Node();
-    temp = head_node;
-    int address = 0;
-
-    while (temp != NULL)
-    {
-        if (temp->is_master == false)
-        {
-            temp->mux_addr = address;
-            //cout <<hex<< temp->mux_addr << endl;
-            //cout << int_to_hex(temp->mux_addr, 8) << endl;
-            address += temp->offset * 4;
-        }
-        temp = temp->next;
-    }
-}
-
-
 int main()
 {
     Node* x = NULL; 
-    push(x, "io", true,0);
+
+    /*Create linked list of masters and slaves*/
+    push(x, "io", true,0); // linked list, name, is_master, type (0 for master)
     push_to_end(x, "rom", false,ROM);
     push_to_end(x, "sys", false, SYS);
     push_to_end(x, "spi_flash", false,SPI);
+    //push_to_end(x, "PTC", false, SPI);
+    //push_to_end(x, "GPIO", false, SPI);
     push_to_end(x, "uart", false, UART);
+    /*------------------------------------------------------------------------*/
 
-   cout << wb_module_gen(x);
-   wb_gen_addresses(x);
-   cout<< gen_wb_mux(x);
-   cout << gen_wb_mux_io(x);
+  
+    /*Console out of wb_intercon.v. */
+    cout << wb_module_gen(x); 
+    wb_gen_addresses(x); // set addresses before calling gen_wb_mux
+    cout<< gen_wb_mux(x);
+    cout << gen_wb_mux_io(x);
+
+    /*Create file*/
 }
 
 

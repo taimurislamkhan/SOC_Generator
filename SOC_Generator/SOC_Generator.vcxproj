@@ -141,10 +141,6 @@
   <ItemGroup>
     <ClCompile Include="SOC_Generator.cpp" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="D:\Desktop 05122021\Data\Cores-SweRVolf-EH1-master\Cores-SweRVolf-EH1-master\Cores-SweRVolf\build\swervolf_0.7.2\src\swervolf-wb_intercon_0.7.2\wb_intercon.v" />
-    <None Include="D:\Desktop 05122021\Data\Cores-SweRVolf-EH1-master\Cores-SweRVolf-EH1-master\Cores-SweRVolf\build\swervolf_0.7.2\src\swervolf-wb_intercon_0.7.2\wb_intercon.vh" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
