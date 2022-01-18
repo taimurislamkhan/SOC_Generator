@@ -14,6 +14,9 @@ using namespace std;
 #define SYS 2
 #define SPI 3
 #define UART 4
+#define PTC 5
+#define GPIO 6
+//#define PTC  5
 
 //Slave offsets. Defined in bytes
 
@@ -21,6 +24,8 @@ using namespace std;
 #define SYS_OFFSET  16
 #define SPI_OFFSET  16
 #define UART_OFFSET 1024
+#define GPIO_OFFSET  16
+#define PTC_OFFSET 16
 
 //Slave mask
 
@@ -28,6 +33,8 @@ using namespace std;
 #define SYS_MASK 0xffffffc0
 #define SPI_MASK 0xffffffc0
 #define UART_MASK 0xfffff000
+#define GPIO_MASK 0xffffffc0
+#define PTC_MASK 0xffffffc0
 
 /*Linked list containing master / slave properties.Constructor generates names and saves them in string arrays names ios*/
 class Node
@@ -45,6 +52,7 @@ public:
     int mux_addr   =    0;
     unsigned int mux_mask   =    0;
     int offset     =    0;
+    int p_type = 0;
 
     string ios[12] = {};
     //0 n_adr_o
@@ -76,10 +84,12 @@ public:
         //set slave offset and masks
         switch (type)
         {
-        case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK; break;
-        case SYS: offset = SYS_OFFSET; mux_mask = SYS_MASK; break;
-        case SPI: offset = SPI_OFFSET; mux_mask = SPI_MASK; break;
-        case UART: offset = UART_OFFSET; mux_mask = UART_MASK; break;
+        case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK;   p_type = type; break;
+        case SYS: offset = SYS_OFFSET; mux_mask = SYS_MASK;   p_type = type; break;
+        case SPI: offset = SPI_OFFSET; mux_mask = SPI_MASK;   p_type = type; break;
+        case UART: offset = UART_OFFSET; mux_mask = UART_MASK; p_type = type; break;
+        case GPIO: offset = GPIO_OFFSET; mux_mask = GPIO_MASK; p_type = type; break;
+        case PTC: offset = PTC_OFFSET; mux_mask = PTC_MASK;   p_type = type; break;
         default:
             break;
         }
@@ -164,8 +174,9 @@ int getSlaveCount(Node*& head_node)
 
     while (temp != NULL)
     {
-        if (temp->is_master == false)
+        if (temp->is_master == false )
         {
+          
             count++;
         }
         temp = temp->next;
@@ -177,7 +188,7 @@ int getSlaveCount(Node*& head_node)
 string wb_module_gen(Node*& head_node)
 {
     string lines = "";
-    lines += "module wb_intercon \n\t(input\twb_clk_i,\n\tinput\twb_rst_i,\n\t";
+    lines += "module wb_intercon \n\t(input\t\t\twb_clk_i,\n\tinput\t\t\twb_rst_i,\n\t";
     Node* temp = new Node();
     temp = head_node;
     while (temp != NULL)
@@ -187,36 +198,36 @@ string wb_module_gen(Node*& head_node)
         lines += "input  \t["   + to_string(temp->adr_width-1) + ':' + '0' + ']' + '\t' + temp->ios[0] + ",\n\t";
         lines += "input  \t["   + to_string(temp->dat_width-1) + ':' + '0' + ']' + '\t' + temp->ios[1] + ",\n\t";
         lines += "input  \t["   + to_string(temp->sel_width-1) + ':' + '0' + ']' + '\t' + temp->ios[2] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[3] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[4] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[5] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[3] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[4] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[5] + ",\n\t";
         lines += "input  \t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
         lines += "input  \t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[8] + ",\n\t";
-        lines += "output \t\t"  + temp->ios[9] + ",\n\t";
-        lines += "output \t\t"  + temp->ios[10] + ",\n\t";
-        lines += "output \t\t"  + temp->ios[11] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[8] + ",\n\t";
+        lines += "output \t\t\t"  + temp->ios[9] + ",\n\t";
+        lines += "output \t\t\t"  + temp->ios[10] + ",\n\t";
+        lines += "output \t\t\t"  + temp->ios[11] + ",\n\t";
     }
     else
     {
         lines += "output \t["   + to_string(temp->adr_width-1) + ':' + '0' + ']' + '\t' + temp->ios[0] + ",\n\t";
         lines += "output \t["   + to_string(temp->dat_width-1) + ':' + '0' + ']' + '\t' + temp->ios[1] + ",\n\t";
         lines += "output \t["   + to_string(temp->sel_width-1) + ':' + '0' + ']' + '\t' + temp->ios[2] + ",\n\t";
-        lines += "output \t\t"  + temp->ios[3] + ",\n\t";
-        lines += "output \t\t"  + temp->ios[4] + ",\n\t";
-        lines += "output \t\t"  + temp->ios[5] + ",\n\t";
+        lines += "output \t\t\t"  + temp->ios[3] + ",\n\t";
+        lines += "output \t\t\t"  + temp->ios[4] + ",\n\t";
+        lines += "output \t\t\t"  + temp->ios[5] + ",\n\t";
         lines += "output \t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
         lines += "output \t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[8] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[9] + ",\n\t";
-        lines += "input  \t\t"  + temp->ios[10] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[8] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[9] + ",\n\t";
+        lines += "input  \t\t\t"  + temp->ios[10] + ",\n\t";
         if (temp->next==NULL)
         {
-            lines += "input \t\t"  + temp->ios[11] + ");\n";
+            lines += "input \t\t\t"  + temp->ios[11] + ");\n";
         }
         else
         {
-            lines += "input \t\t"  + temp->ios[11] + ",\n\t";
+            lines += "input \t\t\t"  + temp->ios[11] + ",\n\t";
         }
 
     }
@@ -246,7 +257,16 @@ void wb_gen_addresses(Node*& head_node)
     {
         if (temp->is_master == false)
         {
-            temp->mux_addr = address;
+            ///if (temp->p_type == UART)
+           //    temp->mux_addr =  0x2000;
+            //else
+            //{
+                temp->mux_addr = address;
+              /*  if (address >= 0x2000)
+                {
+                    temp->mux_addr = 0x3000;
+                }*/
+            //}
             address += temp->offset * 4;
         }
         temp = temp->next;
@@ -260,6 +280,7 @@ string gen_wb_mux(Node*& head_node)
     temp = head_node;
     string lines="";
     int slave_count = 0;
+    int count = 0;
     slave_count = getSlaveCount(temp);
     lines += "wb_mux\n\t #(.num_slaves (" + to_string(slave_count)+"),\n";
     lines += "\t.MATCH_ADDR ({";
@@ -278,24 +299,30 @@ string gen_wb_mux(Node*& head_node)
         temp = temp->next;
         
     }
-    lines += "\b\b}),\n";
-
+    //lines += "\b\b \b}),";//\b
+    lines.pop_back();
+    lines.pop_back();
+    lines += "}),\n";
     //Generate Mask Line
     lines += "\t.MATCH_MASK ({";
     temp = head_node; // reset linked list to start
     while (temp != NULL)
     {
+        count++;
         if (temp->is_master == false)
         {
             lines += "32'h";
             lines += int_to_hex(temp->mux_mask,8);
+           if (count << slave_count)
             lines += ", ";
 
         }
         temp = temp->next;
 
     }
-    lines += "\b\b}))\n";
+    lines.pop_back();
+    lines.pop_back();
+    lines += "}))\n";//\b
 
     return lines;
 }
@@ -350,11 +377,13 @@ string gen_wb_mux_io(Node*& head_node)
         while (temp != NULL)
         {
             if (temp->is_master == true)
-                lines += temp->ios[count] + ',';
+                lines += temp->ios[count] + ", ";
           
             temp = temp->next;
         }
-        lines += "\b), \n";
+        lines.pop_back();
+        lines.pop_back();
+        lines += "), \n";
         temp = head_node;
         masters = masters->next;
         count++;
@@ -367,14 +396,22 @@ string gen_wb_mux_io(Node*& head_node)
         while (temp != NULL)
         {
             if (temp->is_master == false)
-                lines += temp->ios[count] + ',';
+                lines += temp->ios[count] + ", ";
 
             temp = temp->next;
         }
         if (slaves->next == NULL)
-            lines += "\b}));\n";
+        {
+            lines.pop_back();
+            lines.pop_back();
+            lines += "}));\n";
+        }
         else
-        lines += "\b}),\n";
+        {
+            lines.pop_back();
+            lines.pop_back();
+            lines += "}),\n";
+        }
 
         temp = head_node;
         slaves = slaves->next;
@@ -389,24 +426,42 @@ string gen_wb_mux_io(Node*& head_node)
 int main()
 {
     Node* x = NULL; 
-
+    
     /*Create linked list of masters and slaves*/
     push(x, "io", true,0); // linked list, name, is_master, type (0 for master)
     push_to_end(x, "rom", false,ROM);
     push_to_end(x, "sys", false, SYS);
     push_to_end(x, "spi_flash", false,SPI);
-    //push_to_end(x, "PTC", false, SPI);
-    //push_to_end(x, "GPIO", false, SPI);
-    push_to_end(x, "uart", false, UART);
+    push_to_end(x, "spi", false, SPI);
+    push_to_end(x, "ptc", false, PTC);
+    push_to_end(x, "gpio", false, GPIO);
+    push_to_end(x, "uart1", false, UART);
+    push_to_end(x, "uart2", false, UART);
+    push_to_end(x, "uart3", false, UART);
+    /*------------writing intercon.v file----------------*/
+    ofstream wb_intv;
+    wb_intv.open("wb_intercon.v", ios::out);
+    if (!wb_intv)
+    {
+        cout << "Error in creating file!!!";
+        return 0;
+    }
+    /*Console out of wb_intercon.v. */
+    wb_intv << wb_module_gen(x);
+    wb_gen_addresses(x); // set addresses before calling gen_wb_mux
+    wb_intv << gen_wb_mux(x);
+    wb_intv << gen_wb_mux_io(x);
+    cout << "File created successfully.";
+    wb_intv.close();
+    return 0;
     /*------------------------------------------------------------------------*/
 
-  
     /*Console out of wb_intercon.v. */
-    cout << wb_module_gen(x); 
-    wb_gen_addresses(x); // set addresses before calling gen_wb_mux
-    cout<< gen_wb_mux(x);
-    cout << gen_wb_mux_io(x);
-
+    //cout << wb_module_gen(x); 
+    //wb_gen_addresses(x); // set addresses before calling gen_wb_mux
+    //cout<< gen_wb_mux(x);
+    //cout << gen_wb_mux_io(x);
+    //return 0;
     /*Create file*/
 }
 
