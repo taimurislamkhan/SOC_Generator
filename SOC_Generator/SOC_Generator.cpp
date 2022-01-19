@@ -54,6 +54,7 @@ public:
     int offset     =    0;
     int p_type = 0;
 
+    string wb_wire[12] = {};//wb_intercon.vh 
     string ios[12] = {};
     //0 n_adr_o
     //1 n_dat_o
@@ -99,7 +100,7 @@ public:
             ios[0] = "wb_" + name_in + "_adr_i";
             ios[1] = "wb_" + name_in + "_dat_i";
             ios[2] = "wb_" + name_in + "_sel_i";
-            ios[3] = "wb_" + name_in + "_we_i";
+            ios[3] = "wb_" + name_in + "_we_i ";
             ios[4] = "wb_" + name_in + "_cyc_i";
             ios[5] = "wb_" + name_in + "_stb_i";
             ios[6] = "wb_" + name_in + "_cti_i";
@@ -124,6 +125,18 @@ public:
             ios[10] = "wb_" + name_in + "_err_i";
             ios[11] = "wb_" + name_in + "_rty_i";
         }
+        wb_wire[0] = "wb_m2s_" + name_in + "_adr";
+        wb_wire[1] = "wb_m2s_" + name_in + "_dat";
+        wb_wire[2] = "wb_m2s_" + name_in + "_sel";
+        wb_wire[3] = "wb_m2s_" + name_in + "_we";
+        wb_wire[4] = "wb_m2s_" + name_in + "_cyc";
+        wb_wire[5] = "wb_m2s_" + name_in + "_stb";
+        wb_wire[6] = "wb_m2s_" + name_in + "_cti";
+        wb_wire[7] = "wb_m2s_" + name_in + "_bte";
+        wb_wire[8] = "wb_s2m_" + name_in + "_dat";
+        wb_wire[9] = "wb_s2m_" + name_in + "_ack";
+        wb_wire[10] ="wb_s2m_" + name_in + "_err";
+        wb_wire[11] ="wb_s2m_" + name_in + "_rty";
     }
 
 };
@@ -235,7 +248,46 @@ string wb_module_gen(Node*& head_node)
     }
     return lines;
 }
+string wb_wire_vh_gen(Node*& head_node)
+{
+    string lines = "";
+    //lines += "module wb_intercon \n\t(input\t\t\twb_clk_i,\n\tinput\t\t\twb_rst_i,\n\t";
+    Node* temp = new Node();
+    temp = head_node;
+    while (temp != NULL)
+    {
+        //if (temp->is_master)
+        //{
+        lines += "wire  \t[" + to_string(temp->adr_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[0] + ";\n";
+        lines += "wire  \t[" + to_string(temp->dat_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[1] + ";\n";
+        lines += "wire  \t[" + to_string(temp->sel_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[2] + ";\n";
+        lines += "wire  \t\t\t" + temp->wb_wire[3] + ";\n";
+        lines += "wire  \t\t\t" + temp->wb_wire[4] + ";\n";
+        lines += "wire  \t\t\t" + temp->wb_wire[5] + ";\n";
+        lines += "wire  \t[" + to_string(temp->cti_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[6] + ";\n";
+        lines += "wire  \t[" + to_string(temp->bte_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[7] + ";\n";
+        lines += "wire  \t[" + to_string(temp->dat_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[8] + ";\n";
+        lines += "wire \t\t\t" + temp->wb_wire[9] + ";\n";
+        lines += "wire \t\t\t" + temp->wb_wire[10] + ";\n";
+        lines += "wire \t\t\t" + temp->wb_wire[11] + ";\n";
+        //}
+       
+            /*if (temp->next == NULL)
+            {
+                lines += "input \t\t\t" + temp->ios[11] + ");\n";
+            }
+            else
+            {
+                lines += "input \t\t\t" + temp->ios[11] + ",\n\t";
+            }*/
 
+        
+        temp = temp->next;
+    }
+
+    lines.pop_back();
+    return lines;
+}
 //converts an integer to 8 byte wide string
 
 string int_to_hex(int number, int width)
@@ -280,7 +332,7 @@ string gen_wb_mux(Node*& head_node)
     temp = head_node;
     string lines="";
     int slave_count = 0;
-    int count = 0;
+   // int count = 0;
     slave_count = getSlaveCount(temp);
     lines += "wb_mux\n\t #(.num_slaves (" + to_string(slave_count)+"),\n";
     lines += "\t.MATCH_ADDR ({";
@@ -308,12 +360,12 @@ string gen_wb_mux(Node*& head_node)
     temp = head_node; // reset linked list to start
     while (temp != NULL)
     {
-        count++;
+       // count++;
         if (temp->is_master == false)
         {
             lines += "32'h";
             lines += int_to_hex(temp->mux_mask,8);
-           if (count << slave_count)
+          // if (count << slave_count)
             lines += ", ";
 
         }
@@ -422,11 +474,35 @@ string gen_wb_mux_io(Node*& head_node)
 
 }
 
-
+string gen_wb_intvh_io(Node*& head_node)
+{
+        Node* temp = new Node();
+        temp = head_node;
+        string lines = "";
+        lines += "\nwb_intercon wb_intercon0\n";
+        lines += "\t(.wb_clk_i\t\t\t(wb_clk),\n";
+        lines += "\t .wb_rst_i\t\t\t(wb_rst_i),\n";
+        while (temp != NULL)
+        {
+            for (int i = 0; i < 12; i++)
+            {
+                lines += "\t.";
+                lines += temp->ios[i];
+                lines += "\t\t(";
+                lines += temp->wb_wire[i];
+                lines += "),\n";
+            }
+            temp = temp->next;
+        }
+        lines.pop_back();
+        lines.pop_back();
+        lines += ");";
+        return lines;
+}
 int main()
 {
     Node* x = NULL; 
-    
+    /*------------Adding periperals----------------*/
     /*Create linked list of masters and slaves*/
     push(x, "io", true,0); // linked list, name, is_master, type (0 for master)
     push_to_end(x, "rom", false,ROM);
@@ -438,8 +514,8 @@ int main()
     push_to_end(x, "uart1", false, UART);
     push_to_end(x, "uart2", false, UART);
     push_to_end(x, "uart3", false, UART);
-    /*------------writing intercon.v file----------------*/
-    ofstream wb_intv;
+    /*------------writing wb_intercon.v file----------------*/
+    ofstream wb_intv,wb_intvh;
     wb_intv.open("wb_intercon.v", ios::out);
     if (!wb_intv)
     {
@@ -451,11 +527,21 @@ int main()
     wb_gen_addresses(x); // set addresses before calling gen_wb_mux
     wb_intv << gen_wb_mux(x);
     wb_intv << gen_wb_mux_io(x);
-    cout << "File created successfully.";
+    
     wb_intv.close();
-    return 0;
+    /*------------writing wb_intercon.vh file----------------*/
+    wb_intvh.open("wb_intercon.vh", ios::out);
+    if (!wb_intvh)
+    {
+        cout << "Error in creating file!!!";
+        return 0;
+    }
+    wb_intvh << wb_wire_vh_gen(x);
+    wb_intvh << gen_wb_intvh_io(x);
+    wb_intvh.close();
     /*------------------------------------------------------------------------*/
-
+    cout << "File created successfully.\n";
+    return 0;
     /*Console out of wb_intercon.v. */
     //cout << wb_module_gen(x); 
     //wb_gen_addresses(x); // set addresses before calling gen_wb_mux
@@ -464,6 +550,9 @@ int main()
     //return 0;
     /*Create file*/
 }
+
+
+
 
 
 
