@@ -17,6 +17,9 @@ using namespace std;
 #define PTC 5
 #define GPIO 6
 //#define PTC  5
+ 
+
+
 
 //Slave offsets. Defined in bytes
 
@@ -36,6 +39,11 @@ using namespace std;
 #define GPIO_MASK 0xffffffc0
 #define PTC_MASK 0xffffffc0
 
+int board_pin_no=57;
+int board_this_pin = 1;
+string Arty_board_pins[] = { "A9 ","D10","G13","B11","A11","D12","D13","B18","A18","K16","E15","E16","D15","C15","J17","J18","K15","J15","U12","V12","V10","V11","U14","V14","T13","U13","D4 ","D3 ","F4 ","F3 ","E2 ","D2 ","H2 ","G2 ","D9 ","C9 ","B9 ","B8 ","A8 ","C11","C10","A10","H5 ","J5 ","T9 ","T10","G6 ","F6 ","E1 ","G3 ","J4 ","G4 ","J3 ","J2 ","H4 ","K1 ","H6 ","K2" };
+int populate = 0;
+
 /*Linked list containing master / slave properties.Constructor generates names and saves them in string arrays names ios*/
 class Node
 {
@@ -53,6 +61,10 @@ public:
     unsigned int mux_mask   =    0;
     int offset     =    0;
     int p_type = 0;
+
+    int intf_count = 0;
+    string intf_pins[6] = { "","","","","",""};
+    string intf_board[32] = { "","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","" };
 
     //string data_size="";
  //   string address_size="";
@@ -150,11 +162,46 @@ public:
         //set slave offset and masks
         switch (type)
         {
-        case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK;   p_type = type; break;
+        case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK;   p_type = type;  break;
         case SYS: offset = SYS_OFFSET; mux_mask = SYS_MASK;   p_type = type; break;
-        case SPI: offset = SPI_OFFSET; mux_mask = SPI_MASK;   p_type = type; /*data_size = "[7:0]"; address_size = "[2] ? 3'd0 : wb_m2s_spi_flash_adr[5:3]";*/ break;
-        case UART: offset = UART_OFFSET; mux_mask = UART_MASK; p_type = type; /*data_size = "[7:0]"; address_size = "[4:2]";*/ break;
-        case GPIO: offset = GPIO_OFFSET; mux_mask = GPIO_MASK; p_type = type; /*address_size = "[5:2], 2'b0}";*/ break;
+        case SPI: offset = SPI_OFFSET; mux_mask = SPI_MASK;   p_type = type; 
+            intf_count = 3; intf_pins[0] = "output wire"; intf_pins[1] = "o_"+ name_in + "_cs_n"; intf_pins[2] = "output wire"; intf_pins[3] = "o_" + name_in + "_mosi"; intf_pins[4] = "input wire"; intf_pins[5] = "i_" + name_in + "_miso"; 
+            if ((board_this_pin+3)<58)
+            {
+                board_this_pin++; intf_board[0] = Arty_board_pins[board_this_pin];  board_this_pin++; intf_board[1] = Arty_board_pins[board_this_pin]; board_this_pin++;  intf_board[2] = Arty_board_pins[board_this_pin];
+            }
+            else cout << "enough pins utilized " << name_in+ "\n";
+        break;
+        case UART: offset = UART_OFFSET; mux_mask = UART_MASK; p_type = type; intf_count = 2; 
+            intf_pins[0] = "input wire"; intf_pins[1] = "i_" + name_in + "_rx"; intf_pins[2] = "output wire"; intf_pins[3] = "o_" + name_in + "_tx"; 
+           // if ((board_this_pin  + 2) < 58) { 
+            intf_board[0] = Arty_board_pins[0]; intf_board[1] = Arty_board_pins[1]; 
+        //}
+            //else cout << "enough pins utilized " << name_in + "\n";
+        break;
+        case GPIO: offset = GPIO_OFFSET; mux_mask = GPIO_MASK; p_type = type;  intf_count = 1; intf_pins[0] = "inout wire [31 : 0]"; intf_pins[1] = "gpio_out"; 
+            //if (board_this_pin < 58) {
+              
+            while (board_this_pin < 58 && populate < 32)
+                {
+                    board_this_pin++;
+                    intf_board[populate] = Arty_board_pins[board_this_pin];
+                    
+
+                    populate++;
+                    
+                }
+             //   if (board_this_pin >= 58 && populate >= 32)
+               // {
+               
+                    cout << "enough pins " + to_string(populate) + " utilized gpio\n";
+                //}
+           // }
+
+           // else cout << "enough pins"+to_string(populate)+"utilized gpio\n";
+
+           
+        break;
         case PTC: offset = PTC_OFFSET; mux_mask = PTC_MASK;   p_type = type ; /*address_size = "[5:2],2'b0}";*/ break;
         default:
             break;
@@ -285,10 +332,133 @@ public:
 
 
 };
+
+string gen_xdc(Node*& head_node) 
+{
+    Node* temp = new Node();
+    temp = head_node;
+    string lines = "";
+    string status_assigned = "";
+    string status_Nassigned = "";
+    ifstream xdc_read;
+    xdc_read.open("xdc.txt", ios::in);
+    if (!xdc_read)
+    {
+        cout << "Error in creating file!!!";
+        return 0;
+    }
+    
+    lines.assign((istreambuf_iterator<char>(xdc_read)), (istreambuf_iterator<char>()));
+    lines += "\n";
+    xdc_read.close();
+    int xdc_lines = 0;
+        while (temp != NULL)
+        {
+            if (xdc_lines <= (board_pin_no))
+            {
+                if (temp->p_type == GPIO) { temp->intf_count = populate; }
+                for (int i = 0; i < temp->intf_count; i++)
+                {
+                    lines += "set_property - dict{PACKAGE_PIN  ";
+                    lines += temp->intf_board[i];
+                    lines += "  IOSTANDARD LVCMOS33}[get_ports  ";
+                    if (temp->p_type == GPIO)
+                        lines += temp->intf_pins[1] + "[" + to_string(i) ;
+                    else
+                        lines += temp->intf_pins[i * 2 + 1];
+                    lines += "] #" + temp->name + "\n";
+                    xdc_lines++;
+                }
+                if (temp->p_type == GPIO)
+                {
+                    temp->intf_count = 1;
+                }
+                lines += "\n";
+                
+                status_assigned += temp->name + ", ";
+            }
+            else 
+            {
+                status_Nassigned += temp->name + ", ";
+                //cout << temp->name << " cannot add this\n";
+            }
+            temp = temp->next;
+        }
+
+        status_assigned += " has pins assigned \n";
+        status_Nassigned += " has no pins assignment \n";
+        cout << status_assigned << status_Nassigned;
+    return lines;
+}
+string sweRVolf_nexys_mod(Node*& head_node)
+{
+    
+    Node* temp = new Node();
+    temp = head_node;
+    string line = "";
+    line += "`default_nettype none\n";
+    line += "module swervolf_nexys_a7\n";
+    line += "\t#(parameter bootrom_file = \"bootloader.vh\",\n"; 
+    line += "\tparameter cpu_type = \"EH1\")\n";
+    line += "\t(input wire\t\tclk,\n";
+    line += "\tinput wire\t\trstn,\n";
+    line += "\toutput wire\t\tclk_core,\n";
+    //line += "\tinout wire[31:0]\t\tgpio_out,\n";
+    while (temp != NULL)
+    {
+        for (int i = 0; i < temp->intf_count; i++)
+        {
+            line += "\t"+ temp->intf_pins[i*2] +"\t\t" + temp->intf_pins[i*2+1] + "\n";
+        }
+    temp = temp->next;
+    }
+    line += "\t);\n";
+    return line;
+}
+string sweRVolf_nexys_body(Node*& head_node)
+{
+    Node* temp = new Node();
+    temp = head_node;
+    
+    ifstream nexys_read;
+
+    string lines = "";
+    nexys_read.open("sveRVolf_nexys_body.v", ios::in);
+    if (!nexys_read)
+    {
+        cout << "Error in creating file!!!";
+        return 0;
+    }
+    /*Console out of wb_intercon.v. */
+          // Read a Line from File
+        //while (core_read)
+        //{
+            //getline(core_read, lines);
+    lines.assign((istreambuf_iterator<char>(nexys_read)), (istreambuf_iterator<char>()));
+    lines += "\n";
+    nexys_read.close();
+    while (temp != NULL)
+    {
+        for (int i = 0; i < temp->intf_count; i++)
+        {
+            lines += "\t." + temp->intf_pins[i * 2+1] + "\t\t(" + temp->intf_pins[i * 2 + 1] + ")\n";
+        }
+       
+        if (temp->p_type == SPI)
+        {
+            lines += "\t.o_"+temp->name+"_sclk\t\t(core_clk)\n";
+        }
+        temp = temp->next;
+    }
+    
+    lines += "\t);\n";
+    lines += "\tendmodule\n";
+    return lines;
+}
 string gen_core_start(Node*& head_node)
 {
     ifstream core_read;
-    ofstream core_write;
+   
     string lines = "";
     core_read.open("core_start.v", ios::in);
     if (!core_read)
@@ -804,7 +974,7 @@ string gen_wb_mux(Node*& head_node)
         temp = temp->next;
         
     }
-    //lines += "\b\b \b}),";//\b
+  
     lines.pop_back();
     lines.pop_back();
     lines += "}),\n";
@@ -952,79 +1122,44 @@ string gen_wb_intvh_io(Node*& head_node)
         lines += ");";
         return lines;
 }
-//string core(Node*& head_node)
-//{
-//    Node* temp = new Node();
-//    temp = head_node;
-//    string lines = "";
-//    while (temp != NULL)
-//    {
-//        switch (temp->p_type)
-//        {
-//        case ROM:  lines += "rom_top" + " rom_1\n"; break;
-//        case SYS:  lines += "sys_top" + " sys_1\n"; break;
-//        case SPI:  lines += "spi_top" + " spi_1\n";  break;
-//        case UART: lines += "uart_top" + " uart_1\n"; break;
-//        case GPIO: lines += "gpio_top" + " gpio_1\n"; break;
-//        case PTC:  lines += "ptc_top" + " ptc_1\n"; break;
-//        default:
-//            break;
-//        }
-//    }
-//    lines += "(\n";
-//    lines += ".wb_clk_i (clk),";
-//    lines += ".wb_rst_i (~rst_n),";
-//    lines += ".wb_adr_i ("+temp->wb_wire[0]+"]),";
-//    lines += ".wb_dat_i ("+ temp->wb_wire[1]+"]),";
-//    lines += ".wb_we_i  ("+ temp->wb_wire[1] +"),";
-//    lines += ".wb_cyc_i ("++"),";
-//    lines += ".wb_stb_i ("++"),";
-//    lines += ".wb_sel_i ("++"),";
-//    lines += ".wb_dat_o ("++"),";
-//    lines += ".wb_ack_o ("++"),";
-//
-//
-//    wb_wire[0] = "wb_m2s_" + name_in + "_adr";
-//    wb_wire[1] = "wb_m2s_" + name_in + "_dat";
-//    wb_wire[2] = "wb_m2s_" + name_in + "_sel";
-//    wb_wire[3] = "wb_m2s_" + name_in + "_we";
-//    wb_wire[4] = "wb_m2s_" + name_in + "_cyc";
-//    wb_wire[5] = "wb_m2s_" + name_in + "_stb";
-//    wb_wire[6] = "wb_m2s_" + name_in + "_cti";
-//    wb_wire[7] = "wb_m2s_" + name_in + "_bte";
-//    wb_wire[8] = "wb_s2m_" + name_in + "_dat";
-//    wb_wire[9] = "wb_s2m_" + name_in + "_ack";
-//    wb_wire[10] = "wb_s2m_" + name_in + "_err";
-//    wb_wire[11] = "wb_s2m_" + name_in + "_rty";
-//}
+
 int main()
 {
     Node* x = NULL; 
-    /*------------Adding periperals----------------*/
+    //1-58 arty pins 
+       /*------------Adding periperals----------------*/
     /*Create linked list of masters and slaves*/
+    cout << "*****WELCOME To GENSYS********\n\n";
     push(x, "io", true,0); // linked list, name, is_master, type (0 for master)
     push_to_end(x, "rom", false,ROM);
     push_to_end(x, "sys", false, SYS);
     push_to_end(x, "spi_flash", false,SPI);
-    push_to_end(x, "spi", false, SPI);
+    
     push_to_end(x, "ptc", false, PTC);
-    push_to_end(x, "gpio", false, GPIO);
     push_to_end(x, "uart1", false, UART);
-    push_to_end(x, "uart2", false, UART);
-    push_to_end(x, "uart3", false, UART);
+    push_to_end(x, "uart1", false, UART);
+    push_to_end(x, "spi1", false, SPI);
+    push_to_end(x, "spi2", false, SPI);
+    push_to_end(x, "spi3", false, SPI);
+    push_to_end(x, "spi4", false, SPI);
+   //
+   // 
+    push_to_end(x, "spi6", false, SPI);
+ 
+   // 
+   // 
+    push_to_end(x, "gpio", false, GPIO);
+    push_to_end(x, "spi19", false, SPI);
+    push_to_end(x, "spi20", false, SPI);
+    push_to_end(x, "spi30", false, SPI);
+   // 
+   // push_to_end(x, "uart1", false, UART);
+   //
+    //push_to_end(x, "uart2", false, UART);
+   // push_to_end(x, "uart3", false, UART);
 
-  //  cout << gen_core_start(x);
-  //  cout << gen_core_mid(x);
-  //  
-  ////  cout << gen_core_mid();
-  //  cout << gen_spi(x);
-  //  cout << gen_uart(x);
-  //  cout << gen_gpio(x);
-  //  cout << gen_ptc(x);
-  //  cout << gen_core_end();
-   // cout << gen_core_end();
     /*------------writing wb_intercon.v file----------------*/
-    ofstream wb_intv,wb_intvh,swerv_core;
+    ofstream wb_intv,wb_intvh,swerv_core, swerv_nexys, nexys_xdc;
     wb_intv.open("wb_intercon.v", ios::out);
     if (!wb_intv)
     {
@@ -1063,21 +1198,30 @@ int main()
     swerv_core << gen_ptc(x);
     swerv_core << gen_core_end();
     swerv_core.close(); 
-
-    cout << "File created successfully.\n";
+    /*-------------Writing swervolf_nexys.v file------------------*/
+    swerv_nexys.open("swervolf_nexys.v", ios::out);
+    if (!swerv_nexys)
+    {
+        cout << "Error in creating file!!!";
+        return 0;
+    }
+    swerv_nexys << sweRVolf_nexys_mod(x);
+    swerv_nexys << sweRVolf_nexys_body(x);
+    swerv_nexys.close();
+    /*-------------.xdc file------------------*/
+    nexys_xdc.open("swervolf_nexys.xdc", ios::out);
+    if (!nexys_xdc)
+    {
+        cout << "Error in creating file!!!";
+        return 0;
+    }
+    nexys_xdc << gen_xdc(x);
+    nexys_xdc.close();
+    int Remaining_pins =   board_pin_no - board_this_pin;
+    
+    cout << "Remaining_pins = "<< Remaining_pins<<"\n";
+    cout << "Assinged to GPIOs = " << populate << "\n\n";
+    cout << "Files xdc, core, nexys, wbintercon.v & .vh created successfully.\n\n";
     return 0;
-    /*Console out of wb_intercon.v. */
-    //cout << wb_module_gen(x); 
-    //wb_gen_addresses(x); // set addresses before calling gen_wb_mux
-    //cout<< gen_wb_mux(x);
-    //cout << gen_wb_mux_io(x);
-    //return 0;
-    /*Create file*/
+
 }
-
-
-
-
-
-
-
