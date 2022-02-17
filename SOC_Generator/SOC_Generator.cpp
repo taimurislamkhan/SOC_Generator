@@ -932,17 +932,39 @@ void wb_gen_addresses(Node*& head_node)
     {
         if (temp->is_master == false)
         {
-            ///if (temp->p_type == UART)
-           //    temp->mux_addr =  0x2000;
-            //else
-            //{
-                temp->mux_addr = address;
-              /*  if (address >= 0x2000)
+            int flag = 0;
+            if (temp->name == "sysuart")
+            {
+                temp->mux_addr = 0x2000;
+                address = 0x2000;
+                //flag = 1;
+            }
+            else
+            {
+                if (address < 0x2000 && ((address -1 + temp->offset * 4) < 0x2000) || (address >= 0x3000 && (address -1 + temp->offset * 4) >= 0x3000))
                 {
+                    temp->mux_addr = address;
+                }
+                else 
+                {
+                   
+                    address = 0x3000;
                     temp->mux_addr = 0x3000;
-                }*/
-            //}
-            address += temp->offset * 4;
+                }
+                
+            }
+          //  if (flag == 1)
+          //  {
+              //  address = 0x3000;
+              //  flag = 0;
+           // }
+           // if (flag == 1)
+           // {
+               // temp->mux_addr = 0x3000;
+               // 
+              //  flag = 0;
+          //  }
+                address += temp->offset * 4;
         }
         temp = temp->next;
     }
@@ -1136,7 +1158,7 @@ int main()
     push_to_end(x, "spi_flash", false,SPI);
     
     push_to_end(x, "ptc", false, PTC);
-    push_to_end(x, "uart1", false, UART);
+    push_to_end(x, "spi3", false, SPI);
     push_to_end(x, "uart1", false, UART);
     push_to_end(x, "spi1", false, SPI);
     push_to_end(x, "spi2", false, SPI);
@@ -1152,6 +1174,7 @@ int main()
     push_to_end(x, "spi19", false, SPI);
     push_to_end(x, "spi20", false, SPI);
     push_to_end(x, "spi30", false, SPI);
+    push_to_end(x, "sysuart", false, UART);
    // 
    // push_to_end(x, "uart1", false, UART);
    //
