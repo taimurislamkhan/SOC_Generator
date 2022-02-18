@@ -408,10 +408,12 @@ string sweRVolf_nexys_mod(Node*& head_node)
     {
         for (int i = 0; i < temp->intf_count; i++)
         {
-            line += "\t"+ temp->intf_pins[i*2] +"\t\t" + temp->intf_pins[i*2+1] + "\n";
+            line += "\t"+ temp->intf_pins[i*2] +"\t\t" + temp->intf_pins[i*2+1] + ",\n";
         }
     temp = temp->next;
     }
+    line.pop_back();
+    line.pop_back();
     line += "\t);\n";
     return line;
 }
@@ -439,18 +441,26 @@ string sweRVolf_nexys_body(Node*& head_node)
     nexys_read.close();
     while (temp != NULL)
     {
-        for (int i = 0; i < temp->intf_count; i++)
+        if (temp->p_type != GPIO)
         {
-            lines += "\t." + temp->intf_pins[i * 2+1] + "\t\t(" + temp->intf_pins[i * 2 + 1] + ")\n";
+            for (int i = 0; i < temp->intf_count; i++)
+            {
+                lines += "\t." + temp->intf_pins[i * 2 + 1] + "\t\t(" + temp->intf_pins[i * 2 + 1] + "),\n";
+            }
         }
-       
         if (temp->p_type == SPI)
         {
-            lines += "\t.o_"+temp->name+"_sclk\t\t(core_clk)\n";
+            lines += "\t.o_"+temp->name+"_sclk\t\t(clk_core),\n";
         }
+        if (temp->p_type == GPIO)
+        {
+            lines += "\t.io_data\t\t(gpio_out),\n";
+        }
+        //.io_data(gpio_out),
         temp = temp->next;
     }
-    
+    lines.pop_back();
+    lines.pop_back();
     lines += "\t);\n";
     lines += "\tendmodule\n";
     return lines;
@@ -539,7 +549,7 @@ string gen_core_mid(Node*& head_node)
         //{
             //getline(core_read, lines);
     lines.assign((istreambuf_iterator<char>(core_read)), (istreambuf_iterator<char>()));
-    lines += "\n";
+    lines += "\n\n\n\n\n";
     // Print line in Console
     //cout << lines << endl << endl;
   //  if (core_read.eof())
@@ -548,11 +558,13 @@ string gen_core_mid(Node*& head_node)
     Node* temp = new Node();
     temp = head_node;
     int first_time = 1;
+    //int insde_next_loop = 0;
     while (temp != NULL)
     {
         if (temp->p_type == PTC && first_time == 0)
         {
             lines += temp->name + "_irq | ";
+      //      insde_next_loop = 1;
         }
         if (temp->p_type == PTC && first_time == 1)
         {
@@ -561,8 +573,10 @@ string gen_core_mid(Node*& head_node)
         }
         temp = temp->next;
     }
+    
     lines.pop_back();
     lines.pop_back();
+    if (first_time == 0)
     lines += "),\n";
     temp = head_node;
     first_time = 1;
@@ -582,10 +596,14 @@ string gen_core_mid(Node*& head_node)
         
     lines.pop_back();
     lines.pop_back();
-    lines += "));\n\n";
+    if (first_time == 0)
+        lines += "),\n";
+    lines.pop_back();
+    lines.pop_back();
+    lines += "\n);\n\n";
     
     core_read.close();
-
+   // cout << lines << endl;
 
     return lines;
 }
@@ -628,7 +646,7 @@ string gen_spi(Node*& head_node)
     {
         if (temp->p_type == SPI)
         {
-            lines += "\twire[7:0]\t\t"+ temp->spi_rdt +'\n';
+            lines += "\twire[7:0]\t\t"+ temp->spi_rdt +";\n";
             lines += "\tassign "+ temp->wb_wire[8]+" = {24'd0," + temp->spi_rdt + "};\n";
             lines += "\tsimple_spi " +temp->name +"\n";
             lines += "\t(\n";
@@ -661,7 +679,7 @@ string gen_uart(Node*& head_node)
     {
         if (temp->p_type == UART)
         {
-            lines += "\twire[7:0]\t\t" + temp->uart_rdt + '\n';
+            lines += "\twire[7:0]\t\t" + temp->uart_rdt + +";\n";
             lines += "\tassign " + temp->wb_wire[8] + " = {24'd0," + temp->uart_rdt + "};\n";
             lines += "\ttop_uart " + temp->name + "\n";
             lines += "\t(\n";
@@ -679,12 +697,12 @@ string gen_uart(Node*& head_node)
             lines += "\t." + temp->uart_inta_o + " (" + temp->name + "_irq),\n";
             lines += "\t." + temp->uart_stx_pad_o + " (o_" + temp->name + "_tx),\n";
             lines += "\t." + temp->uart_rts_pad_o + " (),\n";                  
-            lines += "\t." + temp->uart_dtr_pad_o + " ()\n\n";
+            lines += "\t." + temp->uart_dtr_pad_o + " (),\n\n";
 
-            lines += "\t." + temp->uart_srx_pad_i + " ("+ temp->uart_rx +")\n";
-            lines += "\t." + temp->uart_cts_pad_i + " (1'b0)\n";
-            lines += "\t." + temp->uart_dsr_pad_i + " (1'b0)\n";
-            lines += "\t." + temp->uart_ri_pad_i + " (1'b0)\n";
+            lines += "\t." + temp->uart_srx_pad_i + " ("+ temp->uart_rx +"),\n";
+            lines += "\t." + temp->uart_cts_pad_i + " (1'b0),\n";
+            lines += "\t." + temp->uart_dsr_pad_i + " (1'b0),\n";
+            lines += "\t." + temp->uart_ri_pad_i + " (1'b0),\n";
             lines += "\t." + temp->uart_dcd_pad_i + " (1'b0));\n\n";
         }
         temp = temp->next;
@@ -824,46 +842,46 @@ int getSlaveCount(Node*& head_node)
 string wb_module_gen(Node*& head_node)
 {
     string lines = "";
-    lines += "module wb_intercon \n\t(input\t\t\twb_clk_i,\n\tinput\t\t\twb_rst_i,\n\t";
+    lines += "module wb_intercon \n\t(input wire\t\t\twb_clk_i,\n\tinput wire\t\t\twb_rst_i,\n\t";
     Node* temp = new Node();
     temp = head_node;
     while (temp != NULL)
     {
     if (temp->is_master)
     {
-        lines += "input  \t["   + to_string(temp->adr_width-1) + ':' + '0' + ']' + '\t' + temp->ios[0] + ",\n\t";
-        lines += "input  \t["   + to_string(temp->dat_width-1) + ':' + '0' + ']' + '\t' + temp->ios[1] + ",\n\t";
-        lines += "input  \t["   + to_string(temp->sel_width-1) + ':' + '0' + ']' + '\t' + temp->ios[2] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[3] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[4] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[5] + ",\n\t";
-        lines += "input  \t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
-        lines += "input  \t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[8] + ",\n\t";
-        lines += "output \t\t\t"  + temp->ios[9] + ",\n\t";
-        lines += "output \t\t\t"  + temp->ios[10] + ",\n\t";
-        lines += "output \t\t\t"  + temp->ios[11] + ",\n\t";
+        lines += "input  wire\t["   + to_string(temp->adr_width-1) + ':' + '0' + ']' + '\t' + temp->ios[0] + ",\n\t";
+        lines += "input  wire\t["   + to_string(temp->dat_width-1) + ':' + '0' + ']' + '\t' + temp->ios[1] + ",\n\t";
+        lines += "input  wire\t["   + to_string(temp->sel_width-1) + ':' + '0' + ']' + '\t' + temp->ios[2] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[3] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[4] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[5] + ",\n\t";
+        lines += "input  wire\t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
+        lines += "input  wire\t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[8] + ",\n\t";
+        lines += "output wire\t\t\t"  + temp->ios[9] + ",\n\t";
+        lines += "output wire\t\t\t"  + temp->ios[10] + ",\n\t";
+        lines += "output wire\t\t\t"  + temp->ios[11] + ",\n\t";
     }
     else
     {
-        lines += "output \t["   + to_string(temp->adr_width-1) + ':' + '0' + ']' + '\t' + temp->ios[0] + ",\n\t";
-        lines += "output \t["   + to_string(temp->dat_width-1) + ':' + '0' + ']' + '\t' + temp->ios[1] + ",\n\t";
-        lines += "output \t["   + to_string(temp->sel_width-1) + ':' + '0' + ']' + '\t' + temp->ios[2] + ",\n\t";
-        lines += "output \t\t\t"  + temp->ios[3] + ",\n\t";
-        lines += "output \t\t\t"  + temp->ios[4] + ",\n\t";
-        lines += "output \t\t\t"  + temp->ios[5] + ",\n\t";
-        lines += "output \t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
-        lines += "output \t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[8] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[9] + ",\n\t";
-        lines += "input  \t\t\t"  + temp->ios[10] + ",\n\t";
+        lines += "output wire\t["   + to_string(temp->adr_width-1) + ':' + '0' + ']' + '\t' + temp->ios[0] + ",\n\t";
+        lines += "output wire\t["   + to_string(temp->dat_width-1) + ':' + '0' + ']' + '\t' + temp->ios[1] + ",\n\t";
+        lines += "output wire\t["   + to_string(temp->sel_width-1) + ':' + '0' + ']' + '\t' + temp->ios[2] + ",\n\t";
+        lines += "output wire\t\t\t"  + temp->ios[3] + ",\n\t";
+        lines += "output wire\t\t\t"  + temp->ios[4] + ",\n\t";
+        lines += "output wire\t\t\t"  + temp->ios[5] + ",\n\t";
+        lines += "output wire\t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
+        lines += "output wire\t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[8] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[9] + ",\n\t";
+        lines += "input  wire\t\t\t"  + temp->ios[10] + ",\n\t";
         if (temp->next==NULL)
         {
-            lines += "input \t\t\t"  + temp->ios[11] + ");\n";
+            lines += "input wire\t\t\t"  + temp->ios[11] + ");\n";
         }
         else
         {
-            lines += "input \t\t\t"  + temp->ios[11] + ",\n\t";
+            lines += "input wire\t\t\t"  + temp->ios[11] + ",\n\t";
         }
 
     }
@@ -947,23 +965,15 @@ void wb_gen_addresses(Node*& head_node)
                 }
                 else 
                 {
-                   
                     address = 0x3000;
                     temp->mux_addr = 0x3000;
                 }
-                
-            }
+             }
           //  if (flag == 1)
-          //  {
-              //  address = 0x3000;
-              //  flag = 0;
-           // }
-           // if (flag == 1)
-           // {
+          //  {address = 0x3000;flag = 0;}
+           // if (flag == 1){
                // temp->mux_addr = 0x3000;
-               // 
-              //  flag = 0;
-          //  }
+               //  flag = 0;//  }
                 address += temp->offset * 4;
         }
         temp = temp->next;
@@ -1114,7 +1124,7 @@ string gen_wb_mux_io(Node*& head_node)
         slaves = slaves->next;
         count++;
     } 
-  
+    lines += "endmodule\n";
     return lines;
 
 }
@@ -1156,25 +1166,25 @@ int main()
     push_to_end(x, "rom", false,ROM);
     push_to_end(x, "sys", false, SYS);
     push_to_end(x, "spi_flash", false,SPI);
-    
-    push_to_end(x, "ptc", false, PTC);
-    push_to_end(x, "spi3", false, SPI);
-    push_to_end(x, "uart1", false, UART);
-    push_to_end(x, "spi1", false, SPI);
-    push_to_end(x, "spi2", false, SPI);
-    push_to_end(x, "spi3", false, SPI);
-    push_to_end(x, "spi4", false, SPI);
+    push_to_end(x, "sysuart", false, UART);
+   // push_to_end(x, "ptc", false, PTC);
+   // push_to_end(x, "spi3", false, SPI);
+   // push_to_end(x, "uart1", false, UART);
+   // push_to_end(x, "spi1", false, SPI);
+    //push_to_end(x, "spi2", false, SPI);
+   // push_to_end(x, "spi3", false, SPI);
+   // push_to_end(x, "spi4", false, SPI);
    //
    // 
-    push_to_end(x, "spi6", false, SPI);
+   // push_to_end(x, "spi6", false, SPI);
  
    // 
    // 
     push_to_end(x, "gpio", false, GPIO);
-    push_to_end(x, "spi19", false, SPI);
-    push_to_end(x, "spi20", false, SPI);
-    push_to_end(x, "spi30", false, SPI);
-    push_to_end(x, "sysuart", false, UART);
+  //  push_to_end(x, "spi19", false, SPI);7
+   // push_to_end(x, "spi20", false, SPI);
+   // push_to_end(x, "spi30", false, SPI);
+  
    // 
    // push_to_end(x, "uart1", false, UART);
    //
