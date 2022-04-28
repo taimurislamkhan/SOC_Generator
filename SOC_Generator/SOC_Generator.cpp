@@ -16,6 +16,10 @@ using namespace std;
 #define UART 4
 #define PTC 5
 #define GPIO 6
+//#if defined others
+//#define I2C 7
+//#define CAN 8
+//#endif
 //#define PTC  5
  
 
@@ -29,7 +33,8 @@ using namespace std;
 #define UART_OFFSET 1024
 #define GPIO_OFFSET  16
 #define PTC_OFFSET 16
-
+//#define I2C_OFFSET  16
+//#define CAN_OFFSET 16
 //Slave mask
 
 #define ROM_MASK 0xfffff000
@@ -38,10 +43,12 @@ using namespace std;
 #define UART_MASK 0xfffff000
 #define GPIO_MASK 0xffffffc0
 #define PTC_MASK 0xffffffc0
-
-int board_pin_no=57;
+//#define I2C_MASK 0xffffffc0
+//#define CAN_MASK 0xffffffc0
+int board_pin_no= 41;
+// before 57 
 int board_this_pin = 1;
-string Arty_board_pins[] = { "A9 ","D10","G13","B11","A11","D12","D13","B18","A18","K16","E15","E16","D15","C15","J17","J18","K15","J15","U12","V12","V10","V11","U14","V14","T13","U13","D4 ","D3 ","F4 ","F3 ","E2 ","D2 ","H2 ","G2 ","D9 ","C9 ","B9 ","B8 ","A8 ","C11","C10","A10","H5 ","J5 ","T9 ","T10","G6 ","F6 ","E1 ","G3 ","J4 ","G4 ","J3 ","J2 ","H4 ","K1 ","H6 ","K2" };
+string Arty_board_pins[] = { "A9 ","D10","G13","B11","A11","D12","D13","B18","A18","K16","D4 ","D3 ","F4 ","F3 ","E2 ","D2 ","H2 ","G2 ","D9 ","C9 ","B9 ","B8 ","A8 ","C11","C10","A10","H5 ","J5 ","T9 ","T10","G6 ","F6 ","E1 ","G3 ","J4 ","G4 ","J3 ","J2 ","H4 ","K1 ","H6 ","K2" };
 int populate = 0;
 
 /*Linked list containing master / slave properties.Constructor generates names and saves them in string arrays names ios*/
@@ -63,8 +70,8 @@ public:
     int p_type = 0;
 
     int intf_count = 0;
-    string intf_pins[6] = { "","","","","",""};
-    string intf_board[32] = { "","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","" };
+    string intf_pins[8] = { "","","","","","","","" };
+    string intf_board[32] = { "","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""};
 
     //string data_size="";
  //   string address_size="";
@@ -141,6 +148,7 @@ public:
     string gpio_ext_pad_i = "";
     string gpio_ext_pad_o = "";
     string gpio_ext_padoe_o = "";
+    string gpio_rdt = "";
 
     string ptc_gate_clk_pad_i = "";
     string ptc_capt_pad_i = "";
@@ -165,10 +173,21 @@ public:
         case ROM: offset = ROM_OFFSET; mux_mask = ROM_MASK;   p_type = type;  break;
         case SYS: offset = SYS_OFFSET; mux_mask = SYS_MASK;   p_type = type; break;
         case SPI: offset = SPI_OFFSET; mux_mask = SPI_MASK;   p_type = type; 
-            intf_count = 3; intf_pins[0] = "output wire"; intf_pins[1] = "o_"+ name_in + "_cs_n"; intf_pins[2] = "output wire"; intf_pins[3] = "o_" + name_in + "_mosi"; intf_pins[4] = "input wire"; intf_pins[5] = "i_" + name_in + "_miso"; 
-            if ((board_this_pin+3)<58)
+            intf_count = 4; 
+            intf_pins[0] = "output wire"; 
+            intf_pins[1] = "o_"+ name_in + "_cs_n"; 
+            intf_pins[2] = "output wire"; 
+            intf_pins[3] = "o_" + name_in + "_mosi"; 
+            intf_pins[4] = "input wire"; 
+            intf_pins[5] = "i_" + name_in + "_miso"; 
+            intf_pins[6] = "output wire"; 
+            intf_pins[7] = "o_" + name_in + "_sclk";
+            if ((board_this_pin+4)<58)
             {
-                board_this_pin++; intf_board[0] = Arty_board_pins[board_this_pin];  board_this_pin++; intf_board[1] = Arty_board_pins[board_this_pin]; board_this_pin++;  intf_board[2] = Arty_board_pins[board_this_pin];
+                board_this_pin++; intf_board[0] = Arty_board_pins[board_this_pin];  
+                board_this_pin++; intf_board[1] = Arty_board_pins[board_this_pin]; 
+                board_this_pin++;  intf_board[2] = Arty_board_pins[board_this_pin]; 
+                board_this_pin++; intf_board[3] = Arty_board_pins[board_this_pin];
             }
             else cout << "enough pins utilized " << name_in+ "\n";
         break;
@@ -202,6 +221,7 @@ public:
 
            
         break;
+        
         case PTC: offset = PTC_OFFSET; mux_mask = PTC_MASK;   p_type = type ; /*address_size = "[5:2],2'b0}";*/ break;
         default:
             break;
@@ -287,7 +307,7 @@ public:
         uart_dat_o = "wb_dat_o ";
         uart_ack_o = "wb_ack_o ";
 
-        uart_inta_o = "inta_o";
+        uart_inta_o = "int_o";
         uart_stx_pad_o = "stx_pad_o";
         uart_rts_pad_o = "rts_pad_o";
         uart_dtr_pad_o = "dtr_pad_o";
@@ -299,7 +319,7 @@ public:
         uart_dcd_pad_i = "dcd_pad_i";
 
         uart_clk = "clk";
-        uart_wb_rst = "~rst_n";
+        uart_wb_rst = "~rstn";
         uart_rdt = name + "_rdt";
         uart_irq = name + "_irq";
         uart_tx = "o_" + name + "_tx";
@@ -310,6 +330,7 @@ public:
         gpio_ext_pad_i = "ext_pad_i";
         gpio_ext_pad_o = "ext_pad_o";
         gpio_ext_padoe_o = "ext_padoe_o";
+        gpio_rdt = name + "_rdt";
 
         ptc_gate_clk_pad_i= "gate_clk_pad_i";
         ptc_capt_pad_i = "capt_pad_i";
@@ -357,6 +378,7 @@ string gen_xdc(Node*& head_node)
             if (xdc_lines <= (board_pin_no))
             {
                 if (temp->p_type == GPIO) { temp->intf_count = populate; }
+                if (temp->p_type == SPI) { temp->intf_count = 3; }
                 for (int i = 0; i < temp->intf_count; i++)
                 {
                     lines += "set_property - dict{PACKAGE_PIN  ";
@@ -382,6 +404,7 @@ string gen_xdc(Node*& head_node)
                 status_Nassigned += temp->name + ", ";
                 //cout << temp->name << " cannot add this\n";
             }
+            if (temp->p_type == SPI) { temp->intf_count = 4; }
             temp = temp->next;
         }
 
@@ -402,19 +425,26 @@ string sweRVolf_nexys_mod(Node*& head_node)
     line += "\tparameter cpu_type = \"EH1\")\n";
     line += "\t(input wire\t\tclk,\n";
     line += "\tinput wire\t\trstn,\n";
-    line += "\toutput wire\t\tclk_core,\n";
+    //line += "\toutput wire\t\tclk_core,\n";
     //line += "\tinout wire[31:0]\t\tgpio_out,\n";
+   
     while (temp != NULL)
     {
+        if (temp->p_type == SPI ) 
+        temp->intf_count = 3;
         for (int i = 0; i < temp->intf_count; i++)
         {
             line += "\t"+ temp->intf_pins[i*2] +"\t\t" + temp->intf_pins[i*2+1] + ",\n";
         }
+        if (temp->p_type == SPI)
+            temp->intf_count = 4;
     temp = temp->next;
     }
     line.pop_back();
     line.pop_back();
     line += "\t);\n";
+    
+    //cout << line << endl;
     return line;
 }
 string sweRVolf_nexys_body(Node*& head_node)
@@ -439,8 +469,10 @@ string sweRVolf_nexys_body(Node*& head_node)
     lines.assign((istreambuf_iterator<char>(nexys_read)), (istreambuf_iterator<char>()));
     lines += "\n";
     nexys_read.close();
+    
     while (temp != NULL)
     {
+
         if (temp->p_type != GPIO)
         {
             for (int i = 0; i < temp->intf_count; i++)
@@ -450,7 +482,8 @@ string sweRVolf_nexys_body(Node*& head_node)
         }
         if (temp->p_type == SPI)
         {
-            lines += "\t.o_"+temp->name+"_sclk\t\t(clk_core),\n";
+            lines += "\t.o_"+temp->name+"_sclk\t\t(o_" + temp->name + "_sclk),\n";
+            
         }
         if (temp->p_type == GPIO)
         {
@@ -462,6 +495,7 @@ string sweRVolf_nexys_body(Node*& head_node)
     lines.pop_back();
     lines.pop_back();
     lines += "\t);\n";
+    lines += "\twire o_spi_flash_sclk;\n";
     lines += "\tendmodule\n";
     return lines;
 }
@@ -529,7 +563,7 @@ string gen_core_start(Node*& head_node)
     }
     core_read.close();
     
-
+    
     return lines;
 }
 string gen_core_mid(Node*& head_node)
@@ -646,6 +680,8 @@ string gen_spi(Node*& head_node)
     {
         if (temp->p_type == SPI)
         {
+            lines += "\tassign\t\t" + temp->wb_wire[10] +" = 1'b0;\n";
+            lines += "\tassign\t\t" + temp->wb_wire[11] +" = 1'b0;\n";
             lines += "\twire[7:0]\t\t"+ temp->spi_rdt +";\n";
             lines += "\tassign "+ temp->wb_wire[8]+" = {24'd0," + temp->spi_rdt + "};\n";
             lines += "\tsimple_spi " +temp->name +"\n";
@@ -679,9 +715,11 @@ string gen_uart(Node*& head_node)
     {
         if (temp->p_type == UART)
         {
+            lines += "\tassign\t\t" + temp->wb_wire[10] +" = 1'b0;\n";
+            lines += "\tassign\t\t" + temp->wb_wire[11] +" = 1'b0;\n";
             lines += "\twire[7:0]\t\t" + temp->uart_rdt + +";\n";
             lines += "\tassign " + temp->wb_wire[8] + " = {24'd0," + temp->uart_rdt + "};\n";
-            lines += "\ttop_uart " + temp->name + "\n";
+            lines += "\tuart_top " + temp->name + "\n";
             lines += "\t(\n";
             lines += "\t." + temp->uart_clk_i + "("+temp->uart_clk+"),\n";
             lines += "\t." + temp->uart_rst_i + "(" + temp->uart_wb_rst + "),\n";
@@ -719,6 +757,7 @@ string gen_gpio(Node*& head_node)
     {
         if (temp->p_type == GPIO)
         {
+            
             lines += "\twire[31:0] en_"+ temp->name+";\n";
             lines += "\twire " + temp->name + "_irq;\n";
             lines += "\twire[31:0] i_"+ temp->name + ";\n";
@@ -726,6 +765,8 @@ string gen_gpio(Node*& head_node)
             for (int i=0;i<32;i++)
             lines += "\tbidirec "+temp->name+to_string(i)+"(.oe(en_gpio["+to_string(i)+"]), .inp(o_gpio["+ to_string(i) +"]), .outp(i_gpio[" + to_string(i) + "]), .bidir(io_data[" + to_string(i) + "]));\n";
             lines += "\n";
+            lines += "\twire[7:0]\t\t" + temp->gpio_rdt + +";\n";
+            lines += "\tassign " + temp->wb_wire[8] + " = {24'd0," + temp->gpio_rdt + "};\n";
             lines += "\tgpio_top " + temp->name + "\n";
             lines += "\t(\n";
             lines += "\t." + temp->uart_clk_i + "(" + temp->uart_clk + "),\n";
@@ -746,6 +787,7 @@ string gen_gpio(Node*& head_node)
         }
         temp = temp->next;
     }
+    //cout << lines << endl;
     return lines;
 }
 string gen_ptc(Node*& head_node)
@@ -857,7 +899,7 @@ string wb_module_gen(Node*& head_node)
         lines += "input  wire\t\t\t"  + temp->ios[5] + ",\n\t";
         lines += "input  wire\t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
         lines += "input  wire\t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
-        lines += "input  wire\t\t\t"  + temp->ios[8] + ",\n\t";
+        lines += "output  wire\t[" + to_string(temp->dat_width - 1) + ':' + '0' + ']' + '\t' + temp->ios[8] + ",\n\t";
         lines += "output wire\t\t\t"  + temp->ios[9] + ",\n\t";
         lines += "output wire\t\t\t"  + temp->ios[10] + ",\n\t";
         lines += "output wire\t\t\t"  + temp->ios[11] + ",\n\t";
@@ -872,7 +914,7 @@ string wb_module_gen(Node*& head_node)
         lines += "output wire\t\t\t"  + temp->ios[5] + ",\n\t";
         lines += "output wire\t["   + to_string(temp->cti_width-1) + ':' + '0' + ']' + '\t' + temp->ios[6] + ",\n\t";
         lines += "output wire\t["   + to_string(temp->bte_width-1) + ':' + '0' + ']' + '\t' + temp->ios[7] + ",\n\t";
-        lines += "input  wire\t\t\t"  + temp->ios[8] + ",\n\t";
+        lines += "input  wire\t[" + to_string(temp->dat_width - 1) + ':' + '0' + ']' + '\t' + temp->ios[8] + ",\n\t";
         lines += "input  wire\t\t\t"  + temp->ios[9] + ",\n\t";
         lines += "input  wire\t\t\t"  + temp->ios[10] + ",\n\t";
         if (temp->next==NULL)
@@ -892,13 +934,14 @@ string wb_module_gen(Node*& head_node)
 string wb_wire_vh_gen(Node*& head_node)
 {
     string lines = "";
-    //lines += "module wb_intercon \n\t(input\t\t\twb_clk_i,\n\tinput\t\t\twb_rst_i,\n\t";
+    //lines += "wire\t\t\twb_clk;\nwire\t\t\twb_rst;\n";
     Node* temp = new Node();
     temp = head_node;
     while (temp != NULL)
     {
         //if (temp->is_master)
         //{
+       // lines += "wire "
         lines += "wire  \t[" + to_string(temp->adr_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[0] + ";\n";
         lines += "wire  \t[" + to_string(temp->dat_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[1] + ";\n";
         lines += "wire  \t[" + to_string(temp->sel_width - 1) + ':' + '0' + ']' + '\t' + temp->wb_wire[2] + ";\n";
@@ -927,6 +970,7 @@ string wb_wire_vh_gen(Node*& head_node)
     }
 
     lines.pop_back();
+    //cout << lines << endl;
     return lines;
 }
 //converts an integer to 8 byte wide string
@@ -1136,7 +1180,7 @@ string gen_wb_intvh_io(Node*& head_node)
         string lines = "";
         lines += "\nwb_intercon wb_intercon0\n";
         lines += "\t(.wb_clk_i\t\t\t(wb_clk),\n";
-        lines += "\t .wb_rst_i\t\t\t(wb_rst_i),\n";
+        lines += "\t .wb_rst_i\t\t\t(wb_rst),\n";
         while (temp != NULL)
         {
             for (int i = 0; i < 12; i++)
@@ -1157,6 +1201,9 @@ string gen_wb_intvh_io(Node*& head_node)
 
 int main()
 {
+   
+    
+    
     Node* x = NULL; 
     //1-58 arty pins 
        /*------------Adding periperals----------------*/
@@ -1165,9 +1212,18 @@ int main()
     push(x, "io", true,0); // linked list, name, is_master, type (0 for master)
     push_to_end(x, "rom", false,ROM);
     push_to_end(x, "sys", false, SYS);
+    //if (ena)//
+    //for (2)
     push_to_end(x, "spi_flash", false,SPI);
+    //push_to_end(x, "GPIO", false, GPIO);
     push_to_end(x, "sysuart", false, UART);
-   // push_to_end(x, "ptc", false, PTC);
+    
+    //push_to_end(x, "uart0", false, UART);
+    //push_to_end(x, "uart1", false, UART);
+   // push_to_end(x, "spi0", false, SPI);
+    //push_to_end(x, "spi1", false, SPI);
+    //push_to_end(x, "spi2", false, SPI);
+    //push_to_end(x, "ptc", false, PTC);
    // push_to_end(x, "spi3", false, SPI);
    // push_to_end(x, "uart1", false, UART);
    // push_to_end(x, "spi1", false, SPI);
@@ -1180,8 +1236,9 @@ int main()
  
    // 
    // 
-    push_to_end(x, "gpio", false, GPIO);
-  //  push_to_end(x, "spi19", false, SPI);7
+   push_to_end(x, "gpio", false, GPIO);
+    
+  //  push_to_end(x, "spi19", false, SPI);
    // push_to_end(x, "spi20", false, SPI);
    // push_to_end(x, "spi30", false, SPI);
   
@@ -1250,11 +1307,12 @@ int main()
     }
     nexys_xdc << gen_xdc(x);
     nexys_xdc.close();
+    /*-------------stats------------------*/
     int Remaining_pins =   board_pin_no - board_this_pin;
     
     cout << "Remaining_pins = "<< Remaining_pins<<"\n";
     cout << "Assinged to GPIOs = " << populate << "\n\n";
-    cout << "Files xdc, core, nexys, wbintercon.v & .vh created successfully.\n\n";
+    cout << endl << "Files xdc, core, nexys, wbintercon.v & .vh created successfully.\n\n";
     return 0;
 
 }
